@@ -1,0 +1,17 @@
+defaults: 
+  - /qwen_vlm_dataset/individual@datasets:
+      - aokvqa
+      - mscoco
+
+vlm_dataset:
+  dataset:
+    _target_: lerobot.common.datasets.qwen_vlm_datasets.qwen_vlm_dataset.MixtureQwenVLMDataset
+    config:
+      _target_: lerobot.common.datasets.qwen_vlm_datasets.qwen_vlm_dataset.MixtureQwenVLMDatasetConfig
+      datasets: ${qwen_vlm_dataset.datasets}
+      weights: ${qwen_vlm_dataset.vlm_dataset.weights}
+
+
+  weights:
+    aokvqa: 1.0
+    mscoco: 1.0

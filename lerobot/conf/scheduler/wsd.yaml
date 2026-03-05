@@ -1,0 +1,7 @@
+ 
+_target_: lerobot.common.optim.schedulers.WarmupStableDecaySchedulerConfig
+num_warmup_steps: ${training.num_warmup_steps}
+stable_phase_steps: null
+num_decay_steps: null
+peak_lr: ${optimizer.lr}
+decay_lr: 2e-5

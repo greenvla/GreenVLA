@@ -1,0 +1,26 @@
+
+_target_: lerobot.common.datasets.data_config.LeRobotRobocoinAgibotDataConfig
+
+# Dataset identification
+name: robocoin_agibot_joint
+asset_id: robocoin_agibot_joint
+repo_id: robocoin_agibot_joint
+root_dir: <path_to_robocoin_agibot_dataset>
+episodes_list_file: null #${.root_dir}/filter/v1/filtered_episodes.json
+validation_episodes: ${.root_dir}/meta/validation_episodes.json
+return_subtasks: true
+# Action configuration
+action_sequence_keys: [action]
+action_horizon: 10
+action_offset: 0
+action_sample_step: 3
+state_dim: 16
+control_mode: joint
+smooth_actions: false
+map_to_humanoid: false
+map_to_unified_space: false
+# Base configuration
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig
+  local_files_only: true
+  prompt_from_task: true 

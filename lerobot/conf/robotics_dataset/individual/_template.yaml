@@ -1,0 +1,25 @@
+# Template for creating new robotics dataset configs
+# Copy this file and replace the values below
+
+_target_: lerobot.common.datasets.data_config.YOUR_DATA_CONFIG_CLASS
+
+# Dataset identification
+name: your_dataset_name
+asset_id: your_asset_id
+repo_id: your_repo_id
+root_dir: /path/to/your/dataset
+
+# Action configuration
+action_sequence_keys: [action]  # or [actions] depending on your dataset
+action_horizon: 50  # adjust based on your collection frequency
+action_offset: 0
+action_sample_step: 1  # increase if you need to subsample
+state_dim: 14  # adjust based on your robot's state dimension
+control_mode: joint  # or cartesian
+
+
+# Base configuration
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig
+  local_files_only: true  # set to false if using HuggingFace Hub
+  prompt_from_task: true  # set to false if not using task prompts 

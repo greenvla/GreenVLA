@@ -1,0 +1,25 @@
+_target_: lerobot.common.datasets.data_config.LeRobotAgibotDexHandDataConfig
+
+# Dataset identification
+name: agibotworld_dexhand
+asset_id: agibotworld_dexhand
+repo_id: agibotworld_dexhand
+root_dir: <path_to_agibotworld_dexhand_dataset>
+episodes_list_file: ${.root_dir}/filter/v1/filtered_episodes.json
+validation_episodes: ${.root_dir}/meta/validation_episodes.json 
+return_subtasks: true
+
+# Action configuration
+action_sequence_keys: [action]
+action_horizon: 10
+action_offset: 1
+action_sample_step: 8
+state_dim: 30
+control_mode: joint
+map_to_unified_space: false
+map_to_humanoid: true
+# Base configuration
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig
+  local_files_only: true
+  prompt_from_task: true 

@@ -1,0 +1,85 @@
+defaults:
+  - policy: greenvla_policy
+  - image_augmentations: null
+  - robotics_dataset: mixture/fractal
+  - optimizer: adamw
+  - scheduler: wsd
+  - training: default_train
+  - logging: clearml
+  - _self_
+
+
+
+
+run_name: example_bridge_ft_${now:%Y-%m-%d}_${now:%H-%M}
+
+policy:
+  policy_config:
+    max_state_dim: 48 
+    max_action_dim: 48
+    normalization_mode: mean_std
+    base_vlm_model: SberRoboticsCenter/Qwen3-VL-4B-Instruct-action
+    tokenizer_max_length: 356 # for a bridge (there is a one image, we can reduce the amount of tokens)
+    n_action_steps: 10
+    image_shape: [448, 448]
+    model_mode: flow_matching
+    proj_width: 1280  #1024 for 2B, 1280 for 4B #this variable should be divisible by the hidden size of the base model
+    add_control_mode: true
+    add_embodiment_name: true
+    state_noise_amplitude: 0.1
+    add_state_proj_to_action_expert: true
+    apply_noise_to_state_for_flow_matching: true
+    enable_learnable_layer_combination: true
+    suffix_attention_mask: block # causal / block
+    is_knowledge_insulation: true
+    ce_loss_weight: 0.5 
+    attention_implementation: sdpa
+    action_head_batch_multiplier: 4 #default is set to 4
+    expert_block_stride: 4 #set it to 4 or 1 for 4B model, 2 for 2B model, 4B has 36 layers, 2B has 28 layers
+    mask_padded_actions: true #whether to mask padded actions in the loss
+    layer_combination_init: identity # identity / stride_uniform / global_uniform
+
+optimizer:
+  lr: 1e-4
+  betas: [0.9, 0.95]
+  weight_decay: 1e-8
+  grad_clip_norm: 1.0
+
+scheduler:
+  decay_lr: 0.0
+  num_warmup_steps: 1000
+  stable_phase_steps: 34000
+  num_decay_steps: 15000
+
+training:
+  find_unused_parameters: true
+  enable_validation: true
+  compile: false
+  val_freq: 1000
+  gradient_checkpointing_enabled: false
+  batch_size: 8
+  steps: 50000 #total amount of training steps
+  grad_accum_steps: 1
+  log_freq: 50
+  num_warmup_steps: ${scheduler.num_warmup_steps}
+  shuffle: true
+  save_freq: 1000
+  num_workers: 16
+  output_dir: outputs/${now:%Y-%m-%d}/${run_name}
+assets_dir: <path_to_your_assets_directory> # change it to your assets directory
+
+
+# Local .safetensors file, local directory, or HuggingFace Hub model ID
+# Examples:
+#   pretrained_path: /path/to/checkpoint/model.safetensors
+#   pretrained_path: /path/to/checkpoint_dir/
+#   pretrained_path: SberRoboticsCenter/GreenVLA-5b-base-stride-4
+# You can also use SberRoboticsCenter/GreenVLA-5b-base-stride-1,
+# but we obtained that model with stride 4 achieved on few percents better SR
+pretrained_path: SberRoboticsCenter/GreenVLA-5b-base-stride-4
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${run_name}
+  job:
+    name: ${run_name} 

@@ -1,0 +1,3 @@
+_target_: lerobot.common.optim.schedulers.DiffuserSchedulerConfig
+name: "linear"
+num_warmup_steps: ${training.num_warmup_steps}

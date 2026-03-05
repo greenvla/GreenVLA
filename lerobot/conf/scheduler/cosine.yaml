@@ -1,0 +1,6 @@
+ 
+_target_: lerobot.common.optim.schedulers.CosineDecayWithWarmupSchedulerConfig
+num_warmup_steps: ${training.num_warmup_steps}
+num_decay_steps: ${training.num_decay_steps}
+peak_lr: ${optimizer.lr}
+decay_lr: 1e-6

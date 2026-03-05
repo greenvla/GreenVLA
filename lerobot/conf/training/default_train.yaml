@@ -1,0 +1,32 @@
+batch_size: 8
+steps: 100000
+num_warmup_steps: 10000
+num_decay_steps: null
+log_freq: 25
+save_freq: 10000
+num_workers: 16
+num_workers_validation: 8
+shuffle: true
+seed: 42
+resume: false
+prefetch_factor: 4
+output_dir: ???
+grad_accum_steps: 1
+find_unused_parameters: false # Set to true to find unused parameters in the model, may cause slower training
+
+compile: true # Compile model for training
+
+# Validation parameters
+enable_validation: true  # Set to true to enable validation
+use_validation_list: true # by default the validation list 
+val_split: 0.03  # Fraction of data to use for validation (e.g., 0.1 = 10%)
+val_freq: 500 # How often to run validation (in training steps)
+max_val_steps: 10  # Maximum validation steps per evaluation (null = full validation set)
+
+recompute_norm_stats: false
+
+# Visualization parameters
+visualization:
+  plots_per_validation: 5  # Number of random plots to generate per validation cycle (0 = disable)
+  subplot_height: 3  # Height of each subplot in inches
+  subplot_width: 8   # Width of each subplot in inches

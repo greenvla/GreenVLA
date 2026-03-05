@@ -1,0 +1,25 @@
+# Easy augmentation preset - light augmentations for base and wrist cameras
+
+base_camera:
+  _target_: torchvision.transforms.v2.Compose
+  transforms:
+    - _target_: torchvision.transforms.v2.RandomRotation
+      degrees: 5.0
+    - _target_: torchvision.transforms.v2.RandomResizedCrop
+      size: ${policy.policy_config.image_shape}
+      scale: [0.85, 1.0]
+    - _target_: torchvision.transforms.v2.ColorJitter
+      brightness: 0.3
+      contrast: 0.4
+      saturation: 0.5
+      hue: 0.0
+
+wrist_camera:
+  _target_: torchvision.transforms.v2.Compose
+  transforms:
+    - _target_: torchvision.transforms.v2.ColorJitter
+      brightness: 0.3
+      contrast: 0.4
+      saturation: 0.5
+      hue: 0.0
+

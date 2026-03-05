@@ -1,0 +1,60 @@
+defaults: 
+  - /qwen_vlm_dataset/individual@datasets:
+      - aokvqa
+      - robo2vlm
+      - mscoco
+      - objectnet3d
+      - pixmo_pointing
+      - sharebot_affordance
+      - sharebot_trajectory
+      - sharebot_vqa
+      - sunrgbd
+      - open_spaces
+      - robopoint_gqa
+      - robopoint_mscoco_vqa
+      - robopoint_ocr_vqa
+      - robopoint_textvqa
+      - robopoint_pointing_reference
+      - refspatial_multi_view_qa_3d
+      - refspatial_vacant_qa_3d
+      - refspatial_visual_choice_qa_3d
+      - refspatial_simulator_qa
+      - refspatial_reasoning_template_2d
+      - refspatial_reasoning_template_3d
+      - refspatial_choice_qa_2d
+      - refspatial_choice_qa_3d
+
+vlm_dataset:
+  dataset:
+    _target_: lerobot.common.datasets.qwen_vlm_datasets.qwen_vlm_dataset.MixtureQwenVLMDataset
+    config:
+      _target_: lerobot.common.datasets.qwen_vlm_datasets.qwen_vlm_dataset.MixtureQwenVLMDatasetConfig
+      datasets: ${qwen_vlm_dataset.datasets}
+      weights: ${qwen_vlm_dataset.vlm_dataset.weights} 
+
+
+  weights: 
+    aokvqa: 2
+    mscoco: 5
+    objectnet3d: 3
+    sunrgbd: 1
+    pixmo_pointing: 3
+    robo2vlm: 6
+    sharebot_vqa: 6
+    sharebot_trajectory: 1
+    sharebot_affordance: 1
+    open_spaces: 2
+    robopoint_gqa: 2
+    robopoint_mscoco_vqa: 2
+    robopoint_ocr_vqa: 2
+    robopoint_textvqa: 2
+    robopoint_pointing_reference: 2
+    refspatial_multi_view_qa_3d: 0.4
+    refspatial_vacant_qa_3d: 1
+    refspatial_visual_choice_qa_3d: 2
+    refspatial_simulator_qa: 3
+    refspatial_reasoning_template_2d: 6
+    refspatial_reasoning_template_3d: 6
+    refspatial_choice_qa_2d: 4
+    refspatial_choice_qa_3d: 4
+

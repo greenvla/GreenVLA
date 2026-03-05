@@ -1,0 +1,6 @@
+_target_: lerobot.common.optim.optimizers.AdamWConfig
+lr: 2.5e-5
+betas: [0.98, 0.999]
+eps: 1e-8
+weight_decay: 1e-10
+grad_clip_norm: 1.0 

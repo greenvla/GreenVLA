@@ -1,0 +1,22 @@
+
+_target_: lerobot.common.datasets.data_config.LeRobotDroidDataConfig
+
+# Dataset identification
+name: droid_joint
+asset_id: droid_joint
+repo_id: droid_joint
+root_dir: <path_to_droid_dataset>
+
+# Action configuration
+action_sequence_keys: [action]
+action_horizon: 10
+action_offset: 0
+action_sample_step: 2.0
+state_dim: 8
+control_mode: joint
+
+# Base configuration
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig  
+  local_files_only: true
+  prompt_from_task: true 

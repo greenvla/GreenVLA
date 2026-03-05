@@ -1,0 +1,9 @@
+_target_: lerobot.common.datasets.data_config.MixtureDataConfigFactory
+name: bridge
+repo_id: null
+
+data_configs:
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/bridge.yaml}
+
+weights:
+  - 1.0

@@ -1,0 +1,8 @@
+clearml:
+  task:
+    project_name: "Manipulation/2D Manipulation/lerobot"
+    task_name: "${run_name}"
+    task_type: "training"  # or "testing", "inference", etc.
+  logging:
+    level: "INFO"  # or "DEBUG", "WARNING", etc.
+  upload_method: "rclone"  # Options: "none", "rclone", "artifact"

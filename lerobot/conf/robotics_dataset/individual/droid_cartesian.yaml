@@ -1,0 +1,22 @@
+
+_target_: lerobot.common.datasets.data_config.LeRobotDroidDataConfig
+
+# Dataset identification
+name: droid_cartesian
+asset_id: droid_cartesian
+repo_id: droid_cartesian
+root_dir: <path_to_droid_cartesian_dataset>
+
+# Action configuration
+action_sequence_keys: [action]
+action_horizon: 50
+action_offset: 0
+action_sample_step: 1
+state_dim: 7
+control_mode: cartesian
+
+# Base configuration
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig  
+  local_files_only: true
+  prompt_from_task: true 

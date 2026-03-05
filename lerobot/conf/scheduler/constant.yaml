@@ -1,0 +1,4 @@
+ 
+_target_: lerobot.common.optim.schedulers.ConstantWithWarmupSchedulerConfig
+num_warmup_steps: ${training.num_warmup_steps}
+num_decay_steps: ${training.steps}

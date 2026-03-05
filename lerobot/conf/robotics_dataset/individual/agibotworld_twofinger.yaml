@@ -1,0 +1,24 @@
+_target_: lerobot.common.datasets.data_config.LeRobotAgibotTwoFingerDataConfig
+
+# Dataset identification
+name: agibotworld_twofinger
+asset_id: agibotworld_twofinger
+repo_id: agibotworld_twofinger
+root_dir: <path_to_agibotworld_twofinger_dataset>
+validation_episodes: ${.root_dir}/meta/validation_episodes.json 
+return_subtasks: true
+
+# Action configuration
+action_sequence_keys: [action]
+action_horizon: 10
+action_offset: 1
+action_sample_step: 3
+state_dim: 20
+control_mode: joint
+map_to_unified_space: false
+map_to_humanoid: true
+# Base configuration
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig
+  local_files_only: true
+  prompt_from_task: true 

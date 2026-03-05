@@ -1,0 +1,66 @@
+# Hard augmentation preset - strong, diverse augmentations
+
+base_camera:
+  _target_: torchvision.transforms.v2.Compose
+  transforms:
+    - _target_: torchvision.transforms.v2.Resize
+      size: ${policy.policy_config.image_shape}
+      antialias: true
+    - _target_: torchvision.transforms.v2.RandomRotation
+      degrees: 15.0
+    - _target_: torchvision.transforms.v2.RandomResizedCrop
+      size: ${policy.policy_config.image_shape}
+      scale: [0.7, 1.0]
+    - _target_: torchvision.transforms.v2.ColorJitter
+      brightness: [0.6, 1.4]
+      contrast: [0.6, 1.4]
+      saturation: [0.6, 1.4]
+      hue: [0.0, 0.0]
+    - _target_: lerobot.common.datasets.transforms.RandomElasticDeform
+      p: 0.3
+      grid_xy: [10, 10]
+      magnitude: 2.0
+    - _target_: lerobot.common.datasets.transforms.RandomPixelDropout
+      dropout_prob: 0.03
+      p: 0.3
+      per_channel: false
+      fill_random: false
+    - _target_: lerobot.common.datasets.transforms.RandomMultiErasing
+      p: 0.3
+      passes: 3
+      value: "random"
+      scale: [0.01, 0.08]
+      ratio: [0.5, 2.0]
+
+wrist_camera:
+  _target_: torchvision.transforms.v2.Compose
+  transforms:
+    - _target_: torchvision.transforms.v2.Resize
+      size: ${policy.policy_config.image_shape}
+      antialias: true
+    - _target_: torchvision.transforms.v2.RandomRotation
+      degrees: 5.0
+    - _target_: torchvision.transforms.v2.RandomResizedCrop
+      size: ${policy.policy_config.image_shape}
+      scale: [0.85, 1.0]
+    - _target_: torchvision.transforms.v2.ColorJitter
+      brightness: [0.6, 1.4]
+      contrast: [0.6, 1.4]
+      saturation: [0.6, 1.4]
+      hue: [0.0, 0.0]
+    - _target_: lerobot.common.datasets.transforms.RandomElasticDeform
+      p: 0.3
+      grid_xy: [10, 10]
+      magnitude: 2.0
+    - _target_: lerobot.common.datasets.transforms.RandomPixelDropout
+      dropout_prob: 0.03
+      p: 0.3
+      per_channel: false
+      fill_random: false
+    - _target_: lerobot.common.datasets.transforms.RandomMultiErasing
+      p: 0.3
+      passes: 3
+      value: "random"
+      scale: [0.01, 0.08]
+      ratio: [0.5, 2.0]
+

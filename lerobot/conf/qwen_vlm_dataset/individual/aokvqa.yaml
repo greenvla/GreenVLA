@@ -1,0 +1,10 @@
+aokvqa:
+  _target_: lerobot.common.datasets.qwen_vlm_datasets.qwen_vlm_dataset.QwenVLMDataset
+
+  config:
+    _target_: lerobot.common.datasets.qwen_vlm_datasets.qwen_vlm_dataset.QwenVLMDatasetConfig
+    dataset_id: aokvqa
+    dataset_path: /mnt/virtual_ai0001071-01239_SR006-nfs1/datasets/L1/qwen3vl_datasets_labels/aokvqa_train.json
+    model_id: ${policy.policy_config.base_vlm_model}
+    image_shape: ${policy.policy_config.image_shape}
+    max_len: ${policy.policy_config.tokenizer_max_length}

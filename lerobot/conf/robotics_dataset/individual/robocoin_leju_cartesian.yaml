@@ -1,0 +1,25 @@
+_target_: lerobot.common.datasets.data_config.LeRobotRobocoinLejuDataConfig
+
+# Dataset identification
+name: robocoin_leju_cartesian  
+asset_id: robocoin_leju_cartesian
+repo_id: robocoin_leju_cartesian
+root_dir: <path_to_robocoin_leju_dataset>
+episodes_list_file: null #${.root_dir}/filter/v1/filtered_episodes.json
+validation_episodes: null #${.root_dir}/meta/validation_episodes.json
+
+# Action configuration
+action_sequence_keys: [action]
+action_horizon: 10
+action_offset: 0
+action_sample_step: 1
+state_dim: 16 # 6 cartesian values (xyz + euler) + 2 gripper for each hand = 16
+control_mode: cartesian
+smooth_actions: false
+map_to_humanoid: false
+map_to_unified_space: false
+# Base configuration
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig
+  local_files_only: true
+  prompt_from_task: true 

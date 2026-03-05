@@ -1,0 +1,46 @@
+_target_: lerobot.common.datasets.data_config.MixtureDataConfigFactory
+name: fast_mix
+repo_id: null
+
+data_configs:
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/rdt.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/biplay.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/galaxeaworld.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/droid.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/bridge.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/fractal.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/action_net.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/robomind_tienkung.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/agibotworld_dexhand.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/agibotworld_twofinger.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/realsource_world_joint.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/robocoin_agibot_joint.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/robocoin_airbot.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/robocoin_alpha_bot_joint.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/robocoin_cobot_magic.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/robocoin_leju_joint.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/robocoin_r1_lite.yaml}
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/robocoin_rmc_aida_joint.yaml}
+
+
+
+weights:
+  - 1.0
+  - 0.5
+  - 3.0
+  - 2.0
+  - 1.0
+  - 1.0
+  - 0.3
+  - 0.9
+  - 3.0
+  - 1.0
+  - 2.5
+  - 0.5
+  - 1.0
+  - 0.3
+  - 2.0
+  - 0.3
+  - 2.0
+  - 0.8
+

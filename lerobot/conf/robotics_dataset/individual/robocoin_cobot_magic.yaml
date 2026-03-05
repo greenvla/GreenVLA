@@ -1,0 +1,24 @@
+_target_: lerobot.common.datasets.data_config.LeRobotRobocoinCobotMagicDataConfig
+
+# Dataset identification
+name: robocoin_cobot_magic
+asset_id: robocoin_cobot_magic
+repo_id: robocoin_cobot_magic
+root_dir: <path_to_robocoin_cobot_magic_dataset>
+episodes_list_file: null #${.root_dir}/meta/normal_episodes.json
+validation_episodes: ${.root_dir}/meta/validation_episodes.json
+return_subtasks: true
+
+# Action configuration
+action_sequence_keys: [action]
+action_horizon: 10
+action_offset: 0
+action_sample_step: 2
+state_dim: 14
+control_mode: joint
+map_to_unified_space: false
+# Base configuration
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig
+  local_files_only: true
+  prompt_from_task: true 

@@ -1,0 +1,65 @@
+# Medium augmentation preset - moderate augmentations with some elastic and dropout
+
+base_camera:
+  _target_: torchvision.transforms.v2.Compose
+  transforms:
+    - _target_: torchvision.transforms.v2.Resize
+      size: ${policy.policy_config.image_shape}
+      antialias: true
+    - _target_: torchvision.transforms.v2.RandomRotation
+      degrees: 10.0
+    - _target_: torchvision.transforms.v2.RandomResizedCrop
+      size: ${policy.policy_config.image_shape}
+      scale: [0.8, 1.0]
+    - _target_: torchvision.transforms.v2.ColorJitter
+      brightness: [0.7, 1.3]
+      contrast: [0.7, 1.3]
+      saturation: [0.7, 1.3]
+      hue: [0.0, 0.0]
+    - _target_: lerobot.common.datasets.transforms.RandomElasticDeform
+      p: 0.2
+      grid_xy: [10, 10]
+      magnitude: 1.5
+    - _target_: lerobot.common.datasets.transforms.RandomPixelDropout
+      dropout_prob: 0.02
+      p: 0.2
+      per_channel: false
+      fill_random: false
+    - _target_: lerobot.common.datasets.transforms.RandomMultiErasing
+      p: 0.2
+      passes: 2
+      value: "random"
+      scale: [0.01, 0.06]
+      ratio: [0.5, 2.0]
+
+wrist_camera:
+  _target_: torchvision.transforms.v2.Compose
+  transforms:
+    - _target_: torchvision.transforms.v2.Resize
+      size: ${policy.policy_config.image_shape}
+      antialias: true
+    - _target_: torchvision.transforms.v2.RandomRotation
+      degrees: 3.0
+    - _target_: torchvision.transforms.v2.RandomResizedCrop
+      size: ${policy.policy_config.image_shape}
+      scale: [0.9, 1.0]
+    - _target_: torchvision.transforms.v2.ColorJitter
+      brightness: [0.7, 1.3]
+      contrast: [0.7, 1.3]
+      saturation: [0.7, 1.3]
+      hue: [0.0, 0.0]
+    - _target_: lerobot.common.datasets.transforms.RandomElasticDeform
+      p: 0.2
+      grid_xy: [10, 10]
+      magnitude: 1.5
+    - _target_: lerobot.common.datasets.transforms.RandomPixelDropout
+      dropout_prob: 0.02
+      p: 0.2
+      per_channel: false
+      fill_random: false
+    - _target_: lerobot.common.datasets.transforms.RandomMultiErasing
+      p: 0.2
+      passes: 2
+      value: "random"
+      scale: [0.01, 0.06]
+      ratio: [0.5, 2.0]

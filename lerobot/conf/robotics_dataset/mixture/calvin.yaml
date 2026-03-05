@@ -1,0 +1,9 @@
+_target_: lerobot.common.datasets.data_config.MixtureDataConfigFactory
+name: calvin
+repo_id: null
+
+data_configs:
+  -  ${_load_config:lerobot/conf/robotics_dataset/individual/calvin.yaml}
+
+weights:
+  - 1.0

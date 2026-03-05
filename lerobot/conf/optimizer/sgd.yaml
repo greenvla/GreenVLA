@@ -1,0 +1,7 @@
+_target_: lerobot.common.optim.optimizers.SGDConfig
+lr: 1e-3
+momentum: 0.0
+dampening: 0.0
+nesterov: false
+weight_decay: 0.0
+grad_clip_norm: 1.0 

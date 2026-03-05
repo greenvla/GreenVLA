@@ -1,0 +1,21 @@
+_target_: lerobot.common.datasets.data_config.LeRobotCentaurDexHandDataConfig
+
+# Dataset identification
+name: centaur_dexhand
+asset_id: centaur_dexhand
+repo_id: centaur_dexhand
+root_dir: <path_to_centaur_dexhand_dataset>
+
+# Action configuration
+action_sequence_keys: [action]
+action_horizon: 50
+action_offset: 1
+action_sample_step: 1.5
+state_dim: 26
+control_mode: joint
+map_to_unified_space: false
+# Base configuration
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig
+  local_files_only: true
+  prompt_from_task: true 

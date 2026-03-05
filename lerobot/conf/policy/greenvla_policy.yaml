@@ -1,0 +1,118 @@
+policy_config:
+  _target_: lerobot.common.policies.greenvla_policy.configuration_greenvla_policy.GreenVLAPolicyConfig
+
+  # ============================================================================
+  # State/Action Dimensions
+  # ============================================================================
+  max_state_dim: 48
+  max_action_dim: 48
+
+  # ============================================================================
+  # Base Model Configuration
+  # ============================================================================
+  base_vlm_model: SberRoboticsCenter/Qwen3-VL-4B-Instruct-action
+  # base_vlm_model: SberRoboticsCenter/Qwen3-VL-2B-Instruct-action
+
+  # Projection width: 1024 for 2B, 1280 for 4B
+  # Must be divisible by the hidden size of the base model
+  proj_width: 1280
+
+  # Options: bfloat16 / fp16 / fp32 (bfloat16 recommended)
+  precision: bfloat16
+
+  # Options: mean_std / quantile (mean_std better for R1)
+  normalization_mode: quantile
+
+  # Options: flow_matching / token_prediction / mixed (mixed for R0)
+  model_mode: flow_matching
+
+  # ============================================================================
+  # Input Configuration
+  # ============================================================================
+  # Recommended image shape for both 2B and 4B models
+  image_shape: [448, 448]
+
+  # Do not change - required camera views
+  image_keys: [base_0_rgb, left_wrist_0_rgb, right_wrist_0_rgb]
+
+  # Whether to add control mode to the prompt (recommended)
+  add_control_mode: true
+
+  # Whether to add embodiment name to the prompt (recommended)
+  add_embodiment_name: true
+
+  # ============================================================================
+  # Action Configuration
+  # ============================================================================
+  # Number of steps for flow matching
+  num_steps: 10
+
+  # Action horizon
+  n_action_steps: 10
+
+  # Whether to mask padded actions in the loss
+  mask_padded_actions: true
+
+  # ============================================================================
+  # Flow Matching Training
+  # ============================================================================
+  # Noise amplitude applied to state during flow matching training
+  state_noise_amplitude: 0.1
+
+  # Dropout probability for state (currently does not affect anything)
+  state_dropout_prob: 0.5
+
+  # Whether to apply noise to state for flow matching training
+  apply_noise_to_state_for_flow_matching: true
+
+  # Batch multiplier for FM loss computation with same KV cache
+  action_head_batch_multiplier: 4
+
+  # ============================================================================
+  # Architecture Configuration
+  # ============================================================================
+  # Whether to add state projection to action expert
+  # Set to false if model overfits to state
+  add_state_proj_to_action_expert: true
+
+  # Whether to enable learnable layer combination (shows good results)
+  enable_learnable_layer_combination: true
+
+  # Layer combination initialization: identity / stride_uniform / global_uniform
+  layer_combination_init: identity
+
+  # Expert block stride:
+  #   - 4B model (36 layers): 4 recommended
+  #   - 2B model (28 layers): 2 recommended
+  # Defines how many times fewer layers expert has than base model
+  expert_block_stride: 4
+
+  # Options: causal / block (block = full attention among suffix tokens)
+  suffix_attention_mask: block
+
+  # Options: sdpa / eager / flash_attention_2
+  # Note: flash_attention_2 does not work with flow_matching/mixed mode
+  attention_implementation: sdpa
+
+  # ============================================================================
+  # VLM Freezing & Compilation
+  # ============================================================================
+  # Whether to freeze VLM weights
+  freeze_vlm: false
+
+  # Currently does not work properly - keep false
+  compile_sample_actions: false
+
+  # ============================================================================
+  # Mixed Mode / R0 Specific
+  # ============================================================================
+  # Specific parameter for R0
+  is_knowledge_insulation: false
+
+  # Only affects training in mixed mode without Knowledge Insulation
+  ce_loss_weight: 0.5
+
+
+policy:
+  _target_: lerobot.common.policies.greenvla_policy.modeling_greenvla_policy.GreenVLAPolicy
+  config: ${policy.policy_config}

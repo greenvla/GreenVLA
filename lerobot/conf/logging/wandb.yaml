@@ -1,0 +1,6 @@
+wandb:
+  project: "lerobot_greenvla"
+  entity: "perception-manipulation"
+  run_id: "greenvla_debug"
+  mode: "online"
+  group: null 

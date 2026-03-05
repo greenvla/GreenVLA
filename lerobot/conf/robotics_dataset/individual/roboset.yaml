@@ -1,0 +1,23 @@
+_target_: lerobot.common.datasets.data_config.LeRobotRobosetDataConfig
+
+# Dataset identification
+name: roboset
+asset_id: roboset
+repo_id: roboset
+root_dir: <path_to_roboset_dataset>
+validation_episodes: ${.root_dir}/meta/validation_episodes.json
+
+# Action configuration
+action_sequence_keys: [action]
+action_horizon: 10 
+action_offset: 0
+action_sample_step: 0.4
+state_dim: 8
+control_mode: joint
+map_to_unified_space: false
+
+# Base configuration
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig
+  local_files_only: true
+  prompt_from_task: true 
