@@ -59,7 +59,7 @@ We release model checkpoints spanning base pretrained models and embodiment-adap
 | **GreenVLA-5b-stride-1-R1-bridge** | R1 | 5B | Fine-tuned on Bridge (WidowX) | [Hub](https://huggingface.co/SberRoboticsCenter/GreenVLA-5b-stride-1-R1-bridge) |
 | **GreenVLA-5b-stride-1-R2-bridge** | R2 | 5B | RL-aligned on Bridge (WidowX) | [Hub](https://huggingface.co/SberRoboticsCenter/GreenVLA-5b-stride-1-R2-bridge) |
 | **GreenVLA-5b-stride-4-R1-fractal** | R1 | 5B | Fine-tuned on Fractal (Google Robot) | [Hub](https://huggingface.co/SberRoboticsCenter/GreenVLA-5b-stride-4-R1-fractal) |
-| **GreenVLA-5b-stride-1-R2-calvin** | R2 | 5B | RL-aligned on CALVIN | [Hub](https://huggingface.co/SberRoboticsCenter/GreenVLA-5b-stride-1-R2-calvin) |
+| **GreenVLA-5b-stride-4-R2-calvin** | R2 | 5B | RL-aligned on CALVIN | [Hub](https://huggingface.co/SberRoboticsCenter/GreenVLA-5b-stride-4-R2-calvin) |
 
 > **Recommendation:** Start with **GreenVLA-5b-base-stride-1** for fine-tuning on your own embodiment, or use one of the R1/R2 checkpoints for direct evaluation.
 
@@ -164,7 +164,7 @@ See [docs/INFERENCE.md](docs/INFERENCE.md) for the full inference guide and exam
 
 | Model | **Avg Chain Length** |
 |-------|:---:|
-| [**Green-VLA stride-1 R2**](https://huggingface.co/SberRoboticsCenter/GreenVLA-5b-stride-1-R2-calvin) | **4.57** |
+| [**Green-VLA stride-4 R2**](https://huggingface.co/SberRoboticsCenter/GreenVLA-5b-stride-4-R2-calvin) | **4.57** |
 
 
 <br/>

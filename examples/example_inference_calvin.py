@@ -46,7 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=str,
-        default="SberRoboticsCenter/GreenVLA-5b-stride-1-R2-calvin",
+        default="SberRoboticsCenter/GreenVLA-5b-stride-4-R2-calvin",
         help="HuggingFace Hub model ID or local checkpoint path.",
     )
     parser.add_argument(
