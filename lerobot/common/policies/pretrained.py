@@ -26,7 +26,6 @@ from safetensors.torch import load_model as load_model_as_safetensor
 from safetensors.torch import save_model as save_model_as_safetensor
 from torch import Tensor, nn
 
-from lerobot.common.constants import PRETRAINED_MODEL_DIR
 from lerobot.common.utils.hub import HubMixin
 from lerobot.configs.policies import PreTrainedConfig
 
@@ -113,46 +112,30 @@ class PreTrainedPolicy(nn.Module, HubMixin, abc.ABC):
         instance = cls(config, **kwargs)
         if os.path.isdir(model_id):
             print("Loading weights from local directory")
-            # First check inside pretrained_model/ subdirectory, then the directory itself
-            pretrained_dir = os.path.join(model_id, PRETRAINED_MODEL_DIR)
-            if os.path.isdir(pretrained_dir) and os.path.isfile(os.path.join(pretrained_dir, SAFETENSORS_SINGLE_FILE)):
-                model_file = os.path.join(pretrained_dir, SAFETENSORS_SINGLE_FILE)
-            else:
-                model_file = os.path.join(model_id, SAFETENSORS_SINGLE_FILE)
+            model_file = os.path.join(model_id, SAFETENSORS_SINGLE_FILE)
             policy = cls._load_as_safetensor(
                 instance, model_file, config.device, strict
             )
         else:
-            # Try pretrained_model/model.safetensors first, then fall back to model.safetensors
-            hub_kwargs = dict(
-                repo_id=model_id,
-                revision=revision,
-                cache_dir=cache_dir,
-                force_download=force_download,
-                proxies=proxies,
-                resume_download=resume_download,
-                token=token,
-                local_files_only=local_files_only,
-            )
             try:
                 model_file = hf_hub_download(
-                    filename=f"{PRETRAINED_MODEL_DIR}/{SAFETENSORS_SINGLE_FILE}",
-                    **hub_kwargs,
+                    repo_id=model_id,
+                    filename=SAFETENSORS_SINGLE_FILE,
+                    revision=revision,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    proxies=proxies,
+                    resume_download=resume_download,
+                    token=token,
+                    local_files_only=local_files_only,
                 )
-            except (HfHubHTTPError, Exception):
-                try:
-                    model_file = hf_hub_download(
-                        filename=SAFETENSORS_SINGLE_FILE,
-                        **hub_kwargs,
-                    )
-                except HfHubHTTPError as e:
-                    raise FileNotFoundError(
-                        f"{SAFETENSORS_SINGLE_FILE} not found on the HuggingFace Hub in {model_id} "
-                        f"(tried both '{PRETRAINED_MODEL_DIR}/{SAFETENSORS_SINGLE_FILE}' and '{SAFETENSORS_SINGLE_FILE}')"
-                    ) from e
-            policy = cls._load_as_safetensor(
-                instance, model_file, config.device, strict
-            )
+                policy = cls._load_as_safetensor(
+                    instance, model_file, config.device, strict
+                )
+            except HfHubHTTPError as e:
+                raise FileNotFoundError(
+                    f"{SAFETENSORS_SINGLE_FILE} not found on the HuggingFace Hub in {model_id}"
+                ) from e
 
         policy.to(config.device)
         policy.eval()
@@ -162,7 +145,46 @@ class PreTrainedPolicy(nn.Module, HubMixin, abc.ABC):
     def _load_as_safetensor(
         cls, model: T, model_file: str, map_location: str, strict: bool
     ) -> T:
+        needs_filtering = cls._checkpoint_needs_filtering(model, model_file)
+        if needs_filtering:
+            logging.info(
+                "Checkpoint has extra/mismatched keys or dtypes — "
+                "using memory-efficient filtered loader."
+            )
+            cls._load_filtered_state_dict(model, model_file, map_location)
+        else:
+            cls._load_safetensor_impl(model, model_file, map_location, strict)
+        return model
 
+    @classmethod
+    def _checkpoint_needs_filtering(
+        cls, model: T, model_file: str
+    ) -> bool:
+        """Quick check whether the checkpoint keys/dtypes match the model.
+        Avoids materialising full state_dict — only inspects names and dtypes."""
+        from safetensors import safe_open
+
+        model_meta = {}
+        for name, param in model.named_parameters():
+            model_meta[name] = param.dtype
+        for name, buf in model.named_buffers():
+            model_meta[name] = buf.dtype
+        model_keys = set(model_meta.keys())
+
+        with safe_open(model_file, framework="pt", device="cpu") as f:
+            ckpt_keys = set(f.keys())
+            if ckpt_keys != model_keys:
+                return True
+            for key in list(ckpt_keys)[:5]:
+                t = f.get_tensor(key)
+                if t.dtype != model_meta[key]:
+                    return True
+        return False
+
+    @classmethod
+    def _load_safetensor_impl(
+        cls, model: T, model_file: str, map_location: str, strict: bool
+    ) -> None:
         if packaging.version.parse(safetensors.__version__) < packaging.version.parse(
             "0.4.3"
         ):
@@ -179,7 +201,67 @@ class PreTrainedPolicy(nn.Module, HubMixin, abc.ABC):
             safetensors.torch.load_model(
                 model, model_file, strict=strict, device=map_location
             )
-        return model
+
+    @classmethod
+    def _load_filtered_state_dict(
+        cls, model: T, model_file: str, map_location: str
+    ) -> None:
+        """Memory-efficient loader for checkpoints that may have extra keys
+        (e.g. untied weights from FSDP) or dtype mismatches (e.g. float32
+        saved by FSDP when the model uses bfloat16).
+
+        Uses safe_open to lazily read one tensor at a time, cast it to the
+        model's expected dtype, and assign it directly into the model's
+        parameters/buffers — avoiding loading the full checkpoint into RAM."""
+        from safetensors import safe_open
+
+        model_meta = {}
+        for name, param in model.named_parameters():
+            model_meta[name] = param.dtype
+        for name, buf in model.named_buffers():
+            model_meta[name] = buf.dtype
+        model_keys = set(model_meta.keys())
+
+        # Non-persistent buffers (e.g. rotary_emb.inv_freq) are recomputed
+        # at init and intentionally excluded from checkpoints.
+        non_persistent = set()
+        for module_name, module in model.named_modules():
+            for buf_name in getattr(module, "_non_persistent_buffers_set", set()):
+                full = f"{module_name}.{buf_name}" if module_name else buf_name
+                non_persistent.add(full)
+
+        loaded_keys = []
+        skipped_keys = []
+
+        with safe_open(model_file, framework="pt", device="cpu") as f:
+            for key in f.keys():
+                if key not in model_keys:
+                    skipped_keys.append(key)
+                    continue
+                tensor = f.get_tensor(key)
+                expected_dtype = model_meta[key]
+                if tensor.dtype != expected_dtype:
+                    tensor = tensor.to(expected_dtype)
+                parts = key.split(".")
+                mod = model
+                for part in parts[:-1]:
+                    mod = getattr(mod, part)
+                param_name = parts[-1]
+                existing = getattr(mod, param_name, None)
+                if isinstance(existing, nn.Parameter):
+                    existing.data.copy_(tensor)
+                else:
+                    setattr(mod, param_name, tensor)
+                loaded_keys.append(key)
+                del tensor
+
+        missing = model_keys - set(loaded_keys) - non_persistent
+        if skipped_keys:
+            logging.warning("Skipped %d unexpected checkpoint keys: %s",
+                            len(skipped_keys), sorted(skipped_keys)[:5])
+        if missing:
+            logging.warning("Missing %d keys after filtered load: %s",
+                            len(missing), sorted(missing)[:5])
 
     # def generate_model_card(self, *args, **kwargs) -> ModelCard:
     #     card = ModelCard.from_template(
@@ -191,26 +273,6 @@ class PreTrainedPolicy(nn.Module, HubMixin, abc.ABC):
     #     )
     #     return card
 
-    @abc.abstractmethod
-    def get_optim_params(self) -> dict:
-        """
-        Returns the policy-specific parameters dict to be passed on to the optimizer.
-        """
-        raise NotImplementedError
-
-    # TODO(aliberts, rcadene): split into 'forward' and 'compute_loss'?
-    @abc.abstractmethod
-    def forward(self, batch: dict[str, Tensor]) -> tuple[Tensor, dict | None]:
-        """_summary_
-
-        Args:
-            batch (dict[str, Tensor]): _description_
-
-        Returns:
-            tuple[Tensor, dict | None]: The loss and potentially other information. Apart from the loss which
-                is a Tensor, all other items should be logging-friendly, native Python types.
-        """
-        raise NotImplementedError
 
     @abc.abstractmethod
     def select_action(self, batch: dict[str, Tensor]) -> Tensor:

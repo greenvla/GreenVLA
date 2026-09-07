@@ -1,0 +1,31 @@
+stages:
+  - versioning
+  - appsec
+  - building
+  - tagging
+
+include:
+  - component: $CI_SERVER_FQDN/infrastructure/devops/ci-cd-catalog/git-strategies/determinationversion@0.1.10
+    inputs:
+      strategy: tbd
+    rules:
+      - if: "$CI_COMMIT_TAG == null"
+
+  - component: $CI_SERVER_FQDN/infrastructure/devops/ci-cd-catalog/command-builds/tagging@0.4.6
+    rules:
+      - if: '$CI_COMMIT_TAG == null && $CI_COMMIT_BRANCH == "main"'
+
+  - component: $CI_SERVER_FQDN/infrastructure/devops/ci-cd-catalog/command-builds/docker_cloud_build@2.7.2
+    inputs:
+      stage: building
+      dockerName: "green-vla"
+      dockerBuildArgs: "--secret id=aws_config,src=$AWS_CONFIG --secret id=aws_credentials,src=$AWS_CREDENTIALS"
+    rules:
+      - if: "$CI_COMMIT_TAG == null"
+
+  - component: $CI_SERVER_FQDN/infrastructure/devops/ci-cd-catalog/command-builds/appsec_wave@1.7.0
+    inputs:
+      projectID: 453
+      projectPath: "."
+    rules:
+      - if: '$CI_COMMIT_TAG == null'

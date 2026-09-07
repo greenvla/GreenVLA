@@ -1,0 +1,25 @@
+# Embodiment and shared stats from checkpoint 014814; existing runtime unchanged.
+_target_: lerobot.common.datasets.dtwin_stationary_runtime.DtwinStationaryRuntimeConfig
+name: scripted_vla_s0s1_step1_state_action_subtasks_shared
+asset_id: scripted_vla
+repo_id: scripted_vla
+root_dir: null
+sample_weights_file: null
+action_sequence_keys: [action]
+action_horizon: 50
+action_offset: 0
+action_sample_step: 1
+control_mode: joint
+smooth_actions: true
+has_velocities: true
+map_to_closed_kinematic: true
+input_kinematic_space: closed
+model_kinematic_space: closed
+return_subtasks: true
+return_subtasks_mode: strict
+prompt_from_subtask: true
+exclude_negative_subtasks: false
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig
+  local_files_only: true
+  prompt_from_task: false

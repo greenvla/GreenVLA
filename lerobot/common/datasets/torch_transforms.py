@@ -1,28 +1,13 @@
-import logging
-from typing import Protocol, Any, Sequence, TypeAlias, Callable, TypeVar, Dict
 import dataclasses
-import numpy as np
-from scipy.interpolate import pchip_interpolate
-import torch
+from typing import Any, Callable, Dict, Protocol, Sequence, TypeAlias, TypeVar
+
 import einops
-from torch.utils.data import Dataset as TorchDataset
-from lerobot.common.utils.image_tools import (
-    resize_without_pad,
-    resize_image_tensor,
-)
-
-try:
-    import humanfriendly
-
-    _HAS_HUMANFRIENDLY = True
-except ImportError:
-    _HAS_HUMANFRIENDLY = False
-
-
-from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
-from lerobot.common.datasets.utils import print_dataset_summary
+import numpy as np
+import torch
 from rich import print
-import pandas as pd
+from scipy.interpolate import pchip_interpolate
+
+from lerobot.common.utils.image_tools import resize_image_tensor, resize_without_pad
 
 DataDict: TypeAlias = dict[str, Any]
 
@@ -76,10 +61,30 @@ class Group:
         return Group(inputs=(*self.inputs, *inputs), outputs=(*outputs, *self.outputs))
 
 
-@dataclasses.dataclass(frozen=True)
-class RemoveStrings(DataTransformFn):
-    def __call__(self, data: DataDict) -> DataDict:
-        return {k: v for k, v in data.items() if not isinstance(v, str)}
+
+
+DEFAULT_REPACK_KEYS: dict[str, str] = {
+    "prompt": "prompt",
+    "action_temporal_pad": "action_is_pad",
+    "subtask_action_loss_mask": "subtask_action_loss_mask",
+}
+
+# Keys that every InputsTransform should automatically forward from input data
+# to its output dict (if present in the input). Add new keys here to have them
+# propagated through every robot transform without editing each file.
+PASSTHROUGH_KEYS: tuple[str, ...] = (
+    "prompt",
+    "action_temporal_pad",
+    "subtask_action_loss_mask",
+    "policy_metadata",
+)
+
+
+def passthrough_defaults(src: dict, dst: dict) -> None:
+    """Copy PASSTHROUGH_KEYS from *src* to *dst* if they exist in src and are not already in dst."""
+    for key in PASSTHROUGH_KEYS:
+        if key in src and key not in dst:
+            dst[key] = src[key]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -89,6 +94,9 @@ class RepackTransform(DataTransformFn):
     Keys in the structure are new keys, values are paths to old keys (e.g., "observation/images/top").
     This implementation handles simple, direct remapping.
     A more general version would require tree traversal like JAX's flatten_dict/unflatten_dict.
+
+    DEFAULT_REPACK_KEYS (e.g. "prompt") are always included unless explicitly
+    overridden in the provided structure.
     """
 
     structure: dict[str, Any]  # Simplified: new_key -> old_key_path as string
@@ -117,6 +125,10 @@ class RepackTransform(DataTransformFn):
     def __call__(self, data: DataDict) -> DataDict:
         output_data: DataDict = {}
 
+        # Merge default keys (e.g. "prompt") with the user-provided structure.
+        # User-provided keys take precedence over defaults.
+        effective_structure = {**DEFAULT_REPACK_KEYS, **self.structure}
+
         # This is a simplified interpretation of JAX's RepackTransform.
         # It maps flat paths in the original data to potentially nested paths in the new structure.
         # For simplicity, let's assume structure is new_key -> old_key_path for now.
@@ -139,15 +151,186 @@ class RepackTransform(DataTransformFn):
             if isinstance(struct_node, dict):
                 for k, v_path_or_struct in struct_node.items():
                     if isinstance(v_path_or_struct, str):  # it's a path to the old key
-                        current_output_dict[k] = flat_item[v_path_or_struct]
+                        if v_path_or_struct in flat_item:
+                            current_output_dict[k] = flat_item[v_path_or_struct]
+                        pad_path = f"{v_path_or_struct}_is_pad"
+                        if pad_path in flat_item:
+                            current_output_dict[f"{k}_is_pad"] = flat_item[pad_path]
                     elif isinstance(v_path_or_struct, dict):
                         current_output_dict[k] = {}
                         _map_structure(v_path_or_struct, current_output_dict[k])
                     else:  # Should not happen with the example structure
                         current_output_dict[k] = v_path_or_struct
 
-        _map_structure(self.structure, output_data)
+        _map_structure(effective_structure, output_data)
         return output_data
+
+
+@dataclasses.dataclass(frozen=True)
+class TemporalObservationInputsTransform(DataTransformFn):
+    """Apply an existing one-step robot transform to video/state histories.
+
+    Robot transforms remain responsible for embodiment-specific state slicing,
+    image selection, padding, and unified-space mappings. This adapter invokes
+    the same transform on individual temporal observations and stacks only the
+    requested outputs. ``state`` remains the current state for legacy
+    delta-action logic; the policy consumes ``state_history`` separately.
+    """
+
+    transform: DataTransformFn
+    n_video_steps: int = 1
+    n_state_steps: int = 1
+
+    @staticmethod
+    def _copy_leaf(value: Any) -> Any:
+        if isinstance(value, torch.Tensor):
+            return value.clone()
+        if isinstance(value, np.ndarray):
+            return value.copy()
+        return value
+
+    @staticmethod
+    def _stack(values: Sequence[Any]) -> Any:
+        if all(isinstance(value, torch.Tensor) for value in values):
+            return torch.stack(list(values), dim=0)
+        if all(isinstance(value, np.ndarray) for value in values):
+            return np.stack(list(values), axis=0)
+        return torch.stack([torch.as_tensor(value) for value in values], dim=0)
+
+    @staticmethod
+    def _history_entries(data: DataDict) -> dict[str, Any]:
+        entries = {}
+        for key, value in data.items():
+            if not key.startswith("observation/") or not key.endswith("_is_pad"):
+                continue
+            base_key = key[: -len("_is_pad")]
+            if base_key in data:
+                entries[base_key] = value
+        return entries
+
+    def _frame_data(
+        self,
+        data: DataDict,
+        history_entries: dict[str, Any],
+        overrides: dict[str, int],
+    ) -> DataDict:
+        frame = dict(data)
+        for base_key in history_entries:
+            frame_index = overrides.get(base_key, -1)
+            frame[base_key] = self._copy_leaf(data[base_key][frame_index])
+            frame.pop(f"{base_key}_is_pad", None)
+
+        # Some embodiment transforms modify actions/state in place. Isolate
+        # temporal calls so one frame cannot alter the next or the source item.
+        for mutable_key in ("actions", "action"):
+            if mutable_key in frame:
+                frame[mutable_key] = self._copy_leaf(frame[mutable_key])
+        return frame
+
+    def _call_with_rng(
+        self,
+        data: DataDict,
+        history_entries: dict[str, Any],
+        overrides: dict[str, int],
+        numpy_rng_state: tuple,
+        torch_rng_state: torch.Tensor,
+    ) -> DataDict:
+        # Keep random camera selection/augmentation identical across frames.
+        np.random.set_state(numpy_rng_state)
+        torch.random.set_rng_state(torch_rng_state)
+        return self.transform(self._frame_data(data, history_entries, overrides))
+
+    def __call__(self, data: DataDict) -> DataDict:
+        history_entries = self._history_entries(data)
+        video_entries = {
+            key: mask
+            for key, mask in history_entries.items()
+            if key != "observation/state"
+        }
+        state_entries = {
+            key: mask for key, mask in history_entries.items() if key == "observation/state"
+        }
+
+        if self.n_video_steps > 1 and not video_entries:
+            raise ValueError(
+                "Video history was requested but no temporal image columns reached the robot transform"
+            )
+        if self.n_state_steps > 1 and not state_entries:
+            raise ValueError(
+                "State history was requested but observation/state is not temporal"
+            )
+
+        for key, mask in video_entries.items():
+            if len(mask) != self.n_video_steps:
+                raise ValueError(
+                    f"{key} history has {len(mask)} steps, expected {self.n_video_steps}"
+                )
+        for key, mask in state_entries.items():
+            if len(mask) != self.n_state_steps:
+                raise ValueError(
+                    f"{key} history has {len(mask)} steps, expected {self.n_state_steps}"
+                )
+
+        numpy_rng_state = np.random.get_state()
+        torch_rng_state = torch.random.get_rng_state()
+        current = self._call_with_rng(
+            data, history_entries, {}, numpy_rng_state, torch_rng_state
+        )
+        advanced_numpy_rng_state = np.random.get_state()
+        advanced_torch_rng_state = torch.random.get_rng_state()
+
+        try:
+            if video_entries:
+                video_frames = [
+                    self._call_with_rng(
+                        data,
+                        history_entries,
+                        dict.fromkeys(video_entries, frame_index),
+                        numpy_rng_state,
+                        torch_rng_state,
+                    )
+                    for frame_index in range(self.n_video_steps)
+                ]
+                for image_key in current["image"]:
+                    current["image"][image_key] = self._stack(
+                        [frame["image"][image_key] for frame in video_frames]
+                    )
+                video_masks = [
+                    torch.as_tensor(mask, dtype=torch.bool)
+                    for mask in video_entries.values()
+                ]
+                if any(
+                    not torch.equal(video_masks[0], mask)
+                    for mask in video_masks[1:]
+                ):
+                    raise ValueError(
+                        "All video views must share the same temporal padding mask"
+                    )
+                current["history_is_pad"] = video_masks[0]
+
+            if state_entries:
+                state_key, state_pad = next(iter(state_entries.items()))
+                state_frames = [
+                    self._call_with_rng(
+                        data,
+                        history_entries,
+                        {state_key: frame_index},
+                        numpy_rng_state,
+                        torch_rng_state,
+                    )
+                    for frame_index in range(self.n_state_steps)
+                ]
+                current["state_history"] = self._stack(
+                    [frame["state"] for frame in state_frames]
+                )
+                current["state_history_is_pad"] = torch.as_tensor(
+                    state_pad, dtype=torch.bool
+                )
+        finally:
+            np.random.set_state(advanced_numpy_rng_state)
+            torch.random.set_rng_state(advanced_torch_rng_state)
+
+        return current
 
 
 def make_bool_mask(*dims: int) -> tuple[bool, ...]:
@@ -160,8 +343,18 @@ def make_bool_mask(*dims: int) -> tuple[bool, ...]:
     return tuple(result)
 
 
+
+
+
+
+        
+#TODO: remove similiar tokenizers and extractors
+        
+
+
+
 @dataclasses.dataclass(frozen=True)
-class TokenizeGreenVLAInputsTransform:
+class TokenizeQwen05InputsTransform:
     tokenizer: None
 
     def __call__(self, data: DataDict) -> DataDict:
@@ -175,9 +368,20 @@ class TokenizeGreenVLAInputsTransform:
         subtask = data.pop("subtask", None)
         next_subtask = data.pop("next_subtask", None)
         is_subtask_transition = data.pop("is_subtask_transition", None)
+        policy_metadata = data.pop("policy_metadata", None)
         
-        tokenized_data = self.tokenizer.tokenize(prompt, state, image_mask, actions, subtask, next_subtask, is_subtask_transition)
+        tokenized_data = self.tokenizer.tokenize(
+            prompt,
+            state,
+            image_mask,
+            actions,
+            subtask,
+            next_subtask,
+            is_subtask_transition,
+            policy_metadata=policy_metadata,
+        )
 
+        # action_loss_mask from dataset is more important, becouse some datasets (humanoid) can handle diffrently
         action_loss_mask = data["action_loss_mask"] if "action_loss_mask" in data else tokenized_data["action_loss_mask"]
         return {
             **data,
@@ -190,7 +394,7 @@ class TokenizeGreenVLAInputsTransform:
         }
         
 @dataclasses.dataclass(frozen=True)
-class ExtractGreenVLAActionsTorch:
+class ExtractQwen05ActionsTorch:
     tokenizer: None
     action_horizon: int
     action_dim: int
@@ -199,6 +403,8 @@ class ExtractGreenVLAActionsTorch:
 
     def __call__(self, data: DataDict) -> DataDict:
         if self.model_mode == "flow_matching" or (self.model_mode == "mixed" and self.inference_mode == "flow_matching"): #TODO: how to handle that mixed model can generate actions in both ways?
+            return data
+        elif self.model_mode == "vlm_and_flow":
             return data
         elif self.model_mode == "token_prediction" or (self.model_mode == "mixed" and self.inference_mode == "token_prediction"):
             if "actions" not in data:
@@ -216,6 +422,11 @@ class ExtractGreenVLAActionsTorch:
             return data
         else:
             raise ValueError(f"Invalid model mode: {self.model_mode}")
+
+
+
+
+
 
 
 @dataclasses.dataclass(frozen=True)
@@ -438,126 +649,17 @@ def parse_image_helper(image: Any) -> np.ndarray | torch.Tensor:
 @dataclasses.dataclass
 class BaseModelConfigPlaceholder:
     action_dim: int
-    model_type: str = "greenvlapolicy"  # Example, adjust as needed by LeRobot
+    model_type: str = "PI0"  # Example, adjust as needed by LeRobot
 
 
-@dataclasses.dataclass(frozen=True)
-class PyTorchModelTransformFactory:
-    """Creates model transforms for PyTorch models."""
-
-    default_prompt: str | None = None
-
-    # These would typically come from a PyTorch/LeRobot specific model config
-    max_token_len: int = 64
-    action_horizon: int = 10
-
-    def __call__(self, model_config: BaseModelConfigPlaceholder) -> Group:
-
-        logging.info(
-            f"PyTorchModelTransformFactory called with model_config: {model_config}, default_prompt: {self.default_prompt}"
-        )
-        logging.info(
-            f"Max token len: {self.max_token_len}, Action horizon: {model_config.action_horizon if hasattr(model_config, 'action_horizon') else self.action_horizon}"
-        )
-
-        return Group(inputs=[], outputs=[])
 
 
 SampleType = TypeVar("SampleType")
 
 
-class TorchTransformedDataset(TorchDataset[SampleType]):
-    """A PyTorch Dataset that applies a sequence of transforms."""
-
-    def __init__(
-        self,
-        dataset: TorchDataset[SampleType],
-        transform: Callable[[SampleType], SampleType] | None = None,
-    ):
-        self._dataset = dataset
-        self._transform = transform if transform is not None else lambda x: x
-        # check that _dataset._dataset exist
-        if hasattr(self._dataset, "_dataset") and isinstance(
-            self._dataset._dataset, LeRobotDataset
-        ):
-            self._dataset_id = self._dataset._dataset.repo_id
-            self._num_samples = self._dataset._dataset.num_frames
-            self._num_episodes = self._dataset._dataset.num_episodes
-            self._fps = self._dataset._dataset.fps
-
-    def __getitem__(self, index: int) -> SampleType:
-        try:
-            item = self._dataset[index]
-        except Exception as e:
-            print(f"[bold red]Error getting item {index} from dataset : {e}[/bold red]")
-            raise e
-        return self._transform(item)
-
-    def __len__(self) -> int:
-        return len(self._dataset)
-
-    def get_dataset_summary(self) -> dict[str, Any]:
-        summary_info = {}
-        try:
-            summary_info["dataset_id"] = self._dataset_id
-            summary_info["num_samples"] = self._num_samples
-            summary_info["num_episodes"] = self._num_episodes
-            summary_info["dataset_length"] = self._num_samples / self._fps
-        except AttributeError as e:
-            raise
-        return summary_info
-
-    def print_dataset_summary(self):
-        summary = self.get_dataset_summary()
-        print_dataset_summary(summary)
-
-    def log_dataset_summary(self, logger) -> pd.DataFrame:
-        """
-        Build a pandas DataFrame from get_dataset_summary().
-        """
-        summary = self.get_dataset_summary()
-        if _HAS_HUMANFRIENDLY:
-            duration_str = humanfriendly.format_timespan(summary["dataset_length"])
-        else:
-            duration_str = f"{summary['dataset_length']:.2f} seconds"
-
-        # rename or reorder columns as you like
-        df = pd.DataFrame(
-            {
-                "Dataset ID": [summary["dataset_id"]],
-                "Amount of Samples": [summary["num_samples"]],
-                "Amount of Episodes": [summary["num_episodes"]],
-                "Total Duration": [duration_str],
-            }
-        )
-        logger.report_table(
-            title="Training Dataset Summary",
-            series="Robot Dataset Summary",
-            iteration=0,
-            table_plot=df,
-        )
 
 
 # Placeholder for PyTorch-native PromptFromLeRobotTask
-class PromptFromLeRobotTaskTorch:
-    def __init__(self, tasks: Sequence[str] | None):
-        self.tasks = tasks
-        # In a real implementation, this might involve a tokenizer
-        # or specific logic to select/format prompts.
-        if tasks is not None:
-            self.task_prompts = {i: task for i, task in enumerate(tasks)}
-        else:
-            self.task_prompts = {}
-        print(
-            f"Initialized PromptFromLeRobotTaskTorch with {len(self.task_prompts)} tasks."
-        )
-
-    def __call__(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        task_index = int(item["task_index"])
-        if (prompt := self.tasks.get(task_index)) is None:
-            raise ValueError(f"{task_index=} not found in task mapping: {self.tasks}")
-
-        return {**item, "prompt": prompt}
 
 
 class MapToUnifiedSpaceTorch(DataTransformFn):
@@ -581,6 +683,10 @@ class MapToUnifiedSpaceTorch(DataTransformFn):
             raise ValueError("mapping_for_unified_space not found in x")
         if "state" in x and mapping_state is not None:
             x["state"], x["state_pad_mask"] = self.map_to_unified_space(x["state"], mapping_state)
+        if "state_history" in x and mapping_state is not None:
+            x["state_history"], x["state_history_pad_mask"] = self.map_to_unified_space(
+                x["state_history"], mapping_state
+            )
         if "actions" in x and mapping_actions is not None:
             x["actions"], x["actions_pad_mask"] = self.map_to_unified_space(x["actions"], mapping_actions)
         x.pop("mapping_for_unified_space_actions", None)
@@ -764,55 +870,56 @@ class NormalizeTorch:
         self.strict = strict
         # Actual normalization logic would be more complex, handling different keys etc.
 
+    def _normalize_value(self, data_value: Any, stats: Any, key: str) -> torch.Tensor:
+        if isinstance(data_value, np.ndarray):
+            data_tensor = torch.from_numpy(data_value).contiguous()
+        elif isinstance(data_value, torch.Tensor):
+            data_tensor = data_value
+        else:
+            raise TypeError(
+                f"Data for key '{key}' must be a torch.Tensor or np.ndarray, "
+                f"got {type(data_value)}."
+            )
+
+        if self.normalization_mode == "mean_std":
+            mean = torch.as_tensor(
+                stats.mean, dtype=data_tensor.dtype, device=data_tensor.device
+            )
+            std = torch.as_tensor(
+                stats.std, dtype=data_tensor.dtype, device=data_tensor.device
+            )
+            return (data_tensor - mean) / (std + 1e-6)
+
+        if self.normalization_mode == "quantile":
+            if stats.q01 is None or stats.q99 is None:
+                raise ValueError(
+                    f"Quantile stats (q01, q99) for key '{key}' are None, "
+                    "but use_quantiles is True. This indicates an issue not caught during initialization."
+                )
+            q01 = torch.as_tensor(
+                stats.q01, dtype=data_tensor.dtype, device=data_tensor.device
+            )
+            q99 = torch.as_tensor(
+                stats.q99, dtype=data_tensor.dtype, device=data_tensor.device
+            )
+            return (data_tensor - q01) / (q99 - q01 + 1e-6) * 2.0 - 1.0
+
+        if self.normalization_mode == "min_max":
+            raise NotImplementedError(
+                "min_max normalization requires explicit min/max statistics, "
+                "which NormStats does not currently store"
+            )
+
+        raise ValueError(f"Unsupported normalization mode: {self.normalization_mode}")
+
     def __call__(self, item: Dict[str, Any]) -> Dict[str, Any]:
         for key, stats in self.norm_stats.items():
             if key in item:
-                data_value = item[key]
-
-                if isinstance(data_value, np.ndarray):
-                    data_tensor = torch.from_numpy(data_value).contiguous()
-                elif isinstance(data_value, torch.Tensor):
-                    data_tensor = data_value
-                else:
-                    raise TypeError(
-                        f"Data for key '{key}' must be a torch.Tensor or np.ndarray, "
-                        f"got {type(data_value)}."
-                    )
-
-                if self.normalization_mode == "mean_std":
-                    _mean = torch.as_tensor(
-                        stats.mean, dtype=data_tensor.dtype, device=data_tensor.device
-                    )
-                    _std = torch.as_tensor(
-                        stats.std, dtype=data_tensor.dtype, device=data_tensor.device
-                    )
-                    normalized_tensor = (data_tensor - _mean) / (_std + 1e-6)
-
-                elif self.normalization_mode == "quantile":
-                    if stats.q01 is None or stats.q99 is None:
-                        # This state should ideally be prevented by __post_init__ / _validate_quantile_stats.
-                        # Raising an error here as a safeguard.
-                        raise ValueError(
-                            f"Quantile stats (q01, q99) for key '{key}' are None, "
-                            "but use_quantiles is True. This indicates an issue not caught during initialization."
-                        )
-                    _q01 = torch.as_tensor(
-                        stats.q01, dtype=data_tensor.dtype, device=data_tensor.device
-                    )
-                    _q99 = torch.as_tensor(
-                        stats.q99, dtype=data_tensor.dtype, device=data_tensor.device
-                    )
-
-                    denominator_quantile = _q99 - _q01
-                    normalized_tensor = (data_tensor - _q01) / (
-                        denominator_quantile + 1e-6
-                    ) * 2.0 - 1.0
-                    # # clipping in range (-1, 1)
-                    # normalized_tensor = torch.clip(
-                    #     input=normalized_tensor, min=-1, max=1
-                    # )
-
-                item[key] = normalized_tensor
+                item[key] = self._normalize_value(item[key], stats, key)
+            if key == "state" and "state_history" in item:
+                item["state_history"] = self._normalize_value(
+                    item["state_history"], stats, "state_history"
+                )
 
             # elif self.strict:
             #     raise KeyError(f"Key '{key}' from norm_stats not found in item, and 'strict' is True.")
@@ -906,5 +1013,48 @@ class PyTorchModelTransformFactory:
         self.default_prompt = default_prompt
 
     def __call__(self, model_config: Any) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
+        # Based on model_config.model_type (e.g., "pi0", "pi0_fast"),
+        # this should return a composed transform function using PyTorch-native transforms.
+        # Example PyTorch-native transforms (need to be implemented):
+        # - TorchInjectDefaultPrompt(self.default_prompt)
+        # - TorchResizeImages(224, 224)
+        # - TorchTokenizePrompt(_tokenizer.PaligemmaTokenizer(model_config.max_token_len)) for PI0
+        # - TorchTokenizeFASTInputs(...) for PI0_FAST
+        # - TorchExtractFASTActions(...) for PI0_FAST (output transform)
+
+        # Placeholder: returns an identity function for now.
+        # A real implementation would construct a TorchGroup or similar.
+
+        # A more concrete example:
+        # from lerobot.common.policies.pi0.torch_tokenizer import TorchPaligemmaTokenizer # Assuming this exists
+        # from .vision import TorchResizeImages # Assuming this exists
+
+        # transforms_list = []
+        # if model_config.model_type == "pi0_placeholder": # Check actual model_type
+        #     transforms_list.append(TorchInjectDefaultPrompt(self.default_prompt))
+        #     transforms_list.append(TorchResizeImages((224,224)))
+        #     # transforms_list.append(TorchTokenizePrompt(TorchPaligemmaTokenizer(model_config.max_token_len)))
+
+        # def composed_transform(data_item):
+        #     for t in transforms_list:
+        #         data_item = t(data_item)
+        #     return data_item
+        # return composed_transform
 
         return lambda x: x  # Identity function as a basic placeholder
+
+@dataclasses.dataclass(frozen=True)
+class SimpleOutputsTransform(DataTransformFn):
+    action_dim: int
+    def __call__(self, data: dict) -> dict:
+        actions = data["actions"]
+
+        assert isinstance(actions, (np.ndarray, torch.Tensor)), f"Unsupported action type: {type(actions)}"
+        assert actions.ndim in (2, 3), f"Unsupported action shape: {actions.shape}"
+
+        if isinstance(actions, torch.Tensor):
+            actions = actions.cpu().numpy()
+
+        data["actions"] = actions[..., :self.action_dim]
+
+        return data

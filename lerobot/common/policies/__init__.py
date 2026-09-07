@@ -12,4 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .greenvla_policy.configuration_greenvla_policy import GreenVLAPolicyConfig as GreenVLAPolicyConfig
+# Register the public name and legacy checkpoint aliases.
+from .greenvla_v1_1.configuration_greenvla_v1_1 import GreenVLAv11Config
+
+Qwen3VLPolicyConfig = GreenVLAv11Config

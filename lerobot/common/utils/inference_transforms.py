@@ -1,6 +1,5 @@
-from typing import Any, List, Callable, Dict, Union
+from typing import List, Callable, Union
 from pathlib import Path
-import numpy as np
 
 from lerobot.configs.policies import PreTrainedConfig
 from lerobot.common.datasets.data_config import DataConfigFactory, DataConfig
@@ -10,9 +9,10 @@ from lerobot.common.datasets.torch_transforms import (
     InjectDefaultPromptTorch,
     MapToUnifiedSpaceTorch,
     MapToSingleSpaceTorch,
+    TemporalObservationInputsTransform,
 )
 import json
-from lerobot.common.utils.normalize import NormStats, deserialize_json
+from lerobot.common.utils.normalize import NormStats
 
 
 
@@ -30,8 +30,8 @@ def get_torch_input_transforms(
     for the LeRobot ecosystem.
 
     Args:
-        policy_config: The pre-trained policy configuration (e.g., an instance of PolicyConfig).
-        data_config_factory: A factory to create the DataConfig (e.g., LeRobotRDTDataConfig()).
+        policy_config: The pre-trained policy configuration (e.g., an instance of PI0Config).
+        data_config_factory: A factory to create the DataConfig (e.g., LeRobotCobotMagicDataConfig()).
         assets_dirs: Path string to the root directory for assets (e.g. norm_stats).
         repack_transforms_output: Optional list of custom output repackaging transforms.
 
@@ -42,6 +42,13 @@ def get_torch_input_transforms(
     data_cfg: DataConfig = data_config_factory.create(
         resolved_assets_dirs, policy_config
     )
+    assert data_cfg.asset_id is not None, (
+        f"{type(data_config_factory).__name__} must define asset_id for inference."
+    )
+    expected_norm_stats_path = resolved_assets_dirs / data_cfg.asset_id / "norm_stats.json"
+    assert data_cfg.norm_stats is not None, (
+        f"Norm stats are required for inference: {expected_norm_stats_path}"
+    )
     
     assert normalization_mode in ["mean_std", "quantile", "min_max"], f"Invalid normalization mode: {normalization_mode}"
 
@@ -51,8 +58,19 @@ def get_torch_input_transforms(
         input_transforms.extend(repack_transforms_output)
     if default_prompt:
         input_transforms.append(InjectDefaultPromptTorch(default_prompt))
-    if data_cfg.data_transforms.inputs:
-        input_transforms.extend(data_cfg.data_transforms.inputs)
+    data_input_transforms = list(data_cfg.data_transforms.inputs)
+    n_video_steps = int(getattr(policy_config, "n_obs_steps", 1))
+    n_state_steps = int(getattr(policy_config, "n_state_obs_steps", 1))
+    if n_video_steps > 1 or n_state_steps > 1:
+        if not data_input_transforms:
+            raise ValueError("Observation history requires an embodiment input transform")
+        data_input_transforms[0] = TemporalObservationInputsTransform(
+            transform=data_input_transforms[0],
+            n_video_steps=n_video_steps,
+            n_state_steps=n_state_steps,
+        )
+    if data_input_transforms:
+        input_transforms.extend(data_input_transforms)
     if data_cfg.norm_stats:
         input_transforms.append(
             NormalizeTorch(data_cfg.norm_stats, normalization_mode=normalization_mode)
@@ -77,8 +95,8 @@ def get_torch_output_transforms(
     Creates output transforms for single or mixture datasets.
 
     Args:
-        policy_config: The pre-trained policy configuration (e.g., an instance of PolicyConfig).
-        data_config_factory: A factory to create the DataConfig (e.g., LeRobotRDTDataConfig()).
+        policy_config: The pre-trained policy configuration (e.g., an instance of PI0Config).
+        data_config_factory: A factory to create the DataConfig (e.g., LeRobotCobotMagicDataConfig()).
         assets_dirs: Path string to the root directory for assets (e.g. norm_stats).
         norm_stats: Optional precomputed norm stats to use.
         repack_transforms_output: Optional list of custom output repackaging transforms.
@@ -93,6 +111,16 @@ def get_torch_output_transforms(
     data_cfg: DataConfig = data_config_factory.create(
         resolved_assets_dirs, policy_config
     )
+    if norm_stats is None:
+        norm_stats = data_cfg.norm_stats
+    assert data_cfg.asset_id is not None, (
+        f"{type(data_config_factory).__name__} must define asset_id for inference."
+    )
+    expected_norm_stats_path = resolved_assets_dirs / data_cfg.asset_id / "norm_stats.json"
+    assert norm_stats is not None, (
+        f"Norm stats are required for inference: {expected_norm_stats_path}"
+    )
+    print(f"Norm stats loaded from file: {expected_norm_stats_path}")
 
     output_transforms: List[Callable] = []
     if data_cfg.model_transforms.outputs:
@@ -110,18 +138,15 @@ def get_torch_output_transforms(
                                                        mapping_actions=mapping_actions,
                                                        mapping_state=mapping_state))
 
-    if norm_stats is None:
-        norm_stats = data_cfg.norm_stats
-    if norm_stats:
-        norm_stats_object = {}
-        for k, v in norm_stats.items():
-            if isinstance(v, dict):
-                norm_stats_object[k] = NormStats(**v)
-            else:
-                norm_stats_object[k] = v
-        output_transforms.append(
-            UnnormalizeTorch(norm_stats_object, normalization_mode=normalization_mode)
-        )
+    norm_stats_object = {}
+    for k, v in norm_stats.items():
+        if isinstance(v, dict):
+            norm_stats_object[k] = NormStats(**v)
+        else:
+            norm_stats_object[k] = v
+    output_transforms.append(
+        UnnormalizeTorch(norm_stats_object, normalization_mode=normalization_mode)
+    )
     if data_cfg.data_transforms.outputs:
         output_transforms.extend(data_cfg.data_transforms.outputs)
     if repack_transforms_output:

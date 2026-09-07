@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "finger_default_position": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    -0.1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    -0.1
+  ],
+  "finger_default_evidence": "green_challenge robots/green/dependencies/cfgs/green_full.interface.json init_state; finger_joint_pos use_default_offset=True; observations absolute",
+  "simulator_commit": "788aaae1a5115ead5aac73701a1d0c3a394005ee",
+  "neck_pitch_bias_rad": 0.11165926378789093,
+  "neck_pitch_limits": [
+    -0.5239999890327454,
+    0.5239999890327454
+  ],
+  "neck_fit": "equal task weighted constant inverse bias, no integration; must be causally validated live",
+  "neck_training_runs": {
+    "cup": {
+      "samples": 125,
+      "mean_error": -0.11483060663938523,
+      "std_error": 0.013512739269176614,
+      "raw_rmse": 0.11562293173815465,
+      "source": "cup_v18b_joints.jsonl",
+      "sha256": "8c3527b2875446a8b81be4e41f5fc81d31cc344299fafebf962bc617e4688054",
+      "cross_scene_offline_residual_rmse": 0.014927283225143279
+    },
+    "plate": {
+      "samples": 175,
+      "mean_error": -0.10848792093639661,
+      "std_error": 0.016192855918054926,
+      "raw_rmse": 0.10968973321092876,
+      "source": "plate_v19b_joints.jsonl",
+      "sha256": "95276d11ca18bf3662bf03f3a509ef8538d1dd2b2aa516e65ad106629fa9284e",
+      "cross_scene_offline_residual_rmse": 0.017390751700538495
+    }
+  },
+  "not_a_success_claim": true
+}

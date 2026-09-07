@@ -1,0 +1,15 @@
+.git/
+tests/
+diagnostics/
+.best/
+.aws/
+.env
+.env.*
+*.pem
+*.key
+**/__pycache__/
+*.pyc
+examples/*.ipynb
+lerobot/scripts/visualize_latest_images.ipynb
+reproducibility/**/reference/benchmark/
+.gitlab-ci.yml

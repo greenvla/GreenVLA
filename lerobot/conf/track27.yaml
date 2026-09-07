@@ -1,0 +1,43 @@
+_target_: lerobot.common.datasets.data_config.LeRobotHumanoidS0S1DataConfig
+
+# Runtime-only twin of the training data contract. Dataset files and sampling
+# weights are intentionally absent; inference needs only the exact transforms
+# and the normalization statistics embedded in the checkpoint.
+# The embodiment identifier the checkpoint was trained under. It is tokenized into the
+# prompt, so it is part of the checkpoint's contract, not a label: renaming it changes the
+# actions the model returns (verified -- the same observations hash differently).
+#
+# Known difference, left alone deliberately: the Track27 checkpoint's own
+# training_state/composed_hydra_config.json records `name: track27_filtered_s0s1_step3`,
+# without the "_runtime" suffix, so the served prompt carries three tokens the model never
+# saw in training. Every published measurement on this checkpoint was taken with the name
+# below, so changing it is a behaviour change to benchmark, not a typo to fix.
+name: track27_filtered_s0s1_step3_runtime
+# Folder name of the statistics inside the checkpoint (checkpoint/norm_stats/<asset_id>).
+# This is the single source of truth for the statistics: the runtime checks that this
+# folder exists at startup and then loads from the same value.
+asset_id: track27_vla
+repo_id: track27_vla
+root_dir: null
+sample_weights_file: null
+
+action_sequence_keys: [action]
+action_horizon: 50
+action_offset: 0
+action_sample_step: 3
+control_mode: joint
+smooth_actions: true
+has_velocities: true
+
+map_to_closed_kinematic: true
+input_kinematic_space: open
+model_kinematic_space: closed
+
+return_subtasks: false
+return_subtasks_mode: disabled
+prompt_from_subtask: false
+exclude_negative_subtasks: false
+
+base_config:
+  _target_: lerobot.common.datasets.data_config.DataConfig
+  local_files_only: true

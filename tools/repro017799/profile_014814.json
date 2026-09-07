@@ -1,0 +1,12 @@
+{
+  "name": "014814-scripted-shared-tracking-v1",
+  "data_config": "scripted_014814",
+  "embodiment": "scripted_vla_s0s1_step1_state_action_subtasks_shared",
+  "checkpoint": {
+    "files": {
+      "pretrained_model/model.safetensors": "5971449a5acc18eb1ee4ec8edecf88926a56966f79e9c16516c00c6728f4ab02",
+      "pretrained_model/config.json": "e2f6fee91b049d7b807db5ea4b61a518c04aed834526a05cdf98602c90fdeaba",
+      "norm_stats/scripted_vla/norm_stats.json": "fb3e942f3cb72322cb9fd21bbaba5eb8eee38f8a75b5a3b6d2c756e004690abd"
+    }
+  }
+}

@@ -2,7 +2,7 @@ import abc
 import logging
 import os
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Type, TypeVar
 
@@ -12,7 +12,6 @@ from huggingface_hub.constants import CONFIG_NAME
 from huggingface_hub.errors import HfHubHTTPError
 
 
-from lerobot.common.constants import PRETRAINED_MODEL_DIR
 from lerobot.common.utils.hub import HubMixin
 from lerobot.common.utils.utils import (
     auto_select_torch_device,
@@ -96,42 +95,27 @@ class PreTrainedConfig(draccus.ChoiceRegistry, HubMixin, abc.ABC):
         model_id = str(pretrained_name_or_path)
         config_file: str | None = None
         if Path(model_id).is_dir():
-            # First, check inside the pretrained_model subdirectory
-            pretrained_dir = Path(model_id) / PRETRAINED_MODEL_DIR
-            if pretrained_dir.is_dir() and CONFIG_NAME in os.listdir(pretrained_dir):
-                config_file = os.path.join(pretrained_dir, CONFIG_NAME)
-            elif CONFIG_NAME in os.listdir(model_id):
+            if CONFIG_NAME in os.listdir(model_id):
                 config_file = os.path.join(model_id, CONFIG_NAME)
             else:
-                print(f"{CONFIG_NAME} not found in {Path(model_id).resolve()} or {pretrained_dir.resolve()}")
+                print(f"{CONFIG_NAME} not found in {Path(model_id).resolve()}")
         else:
-            # Try pretrained_model/config.json first, then fall back to config.json
-            hub_kwargs = dict(
-                repo_id=model_id,
-                revision=revision,
-                cache_dir=cache_dir,
-                force_download=force_download,
-                proxies=proxies,
-                resume_download=resume_download,
-                token=token,
-                local_files_only=local_files_only,
-            )
             try:
                 config_file = hf_hub_download(
-                    filename=f"{PRETRAINED_MODEL_DIR}/{CONFIG_NAME}",
-                    **hub_kwargs,
+                    repo_id=model_id,
+                    filename=CONFIG_NAME,
+                    revision=revision,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    proxies=proxies,
+                    resume_download=resume_download,
+                    token=token,
+                    local_files_only=local_files_only,
                 )
-            except (HfHubHTTPError, Exception):
-                try:
-                    config_file = hf_hub_download(
-                        filename=CONFIG_NAME,
-                        **hub_kwargs,
-                    )
-                except HfHubHTTPError as e:
-                    raise FileNotFoundError(
-                        f"{CONFIG_NAME} not found on the HuggingFace Hub in {model_id} "
-                        f"(tried both '{PRETRAINED_MODEL_DIR}/{CONFIG_NAME}' and '{CONFIG_NAME}')"
-                    ) from e
+            except HfHubHTTPError as e:
+                raise FileNotFoundError(
+                    f"{CONFIG_NAME} not found on the HuggingFace Hub in {model_id}"
+                ) from e
 
         # HACK: this is very ugly, ideally we'd like to be able to do that natively with draccus
         # something like --policy.path (in addition to --policy.type)

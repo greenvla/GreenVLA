@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # Logging
+.best/
 logs
 tmp
 wandb
@@ -94,6 +95,10 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+
+# Keep validation and diagnostic tooling outside the deployment branch.
+/tests/
+/diagnostics/
 
 # Ignore .cache except calibration
 .cache/*
@@ -183,3 +188,7 @@ cython_debug/
 
 test_code/
 log/
+# lerobot/conf/*.yaml are the runtime data contracts and are part of the release: the
+# runtime picks one with --data-config and a checkpoint is unservable without the one it
+# was trained under. They used to be excluded here, back when the runtime was pinned to
+# a single contract and any other yaml in that directory was somebody's scratch file.
