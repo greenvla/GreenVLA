@@ -6,7 +6,7 @@
 
 <br/>
 
-**Sber Robotics Center &middot; Manipulation Team**
+**Sber Robotics Center &middot; Brain Team**
 
 <br/>
 
@@ -25,6 +25,23 @@
    <img src="assets/green_img.jpg" width="1024" />
 
 </div>
+
+<br/>
+
+---
+
+## News
+
+**[2026-10] GreenWAM is out.** [GreenWAM: A World Foundation Model for Robotics](https://github.com/greenvla/GreenWAM) is one robot world model that serves both as a world model and as a policy across 20 robot families, from bimanual arms to dexterous humanoids. It is built on Cosmos 3 Edge; the four benchmark checkpoints and their evaluation code are released.
+
+[**Paper**](https://arxiv.org/abs/2610.18774)&ensp;|&ensp;[**Project Page**](https://greenvla.github.io/GreenWAM/)&ensp;|&ensp;[**Code**](https://github.com/greenvla/GreenWAM)&ensp;|&ensp;[**Weights**](https://huggingface.co/SberRoboticsCenter/GreenWAM)
+
+| Benchmark | Role | GreenWAM |
+|-----------|:----:|:--------:|
+| RoboTwin 2.0 (50 tasks) | policy | **67.54** mean &middot; 86.98 clean &middot; 48.10 randomized |
+| LIBERO &middot; LIBERO-plus | policy | **97.4** LIBERO &middot; **86.8** LIBERO-plus zero-shot |
+| CALVIN ABC&rarr;D | policy | **4.64** average length |
+| WorldArena 1.0, track 1 | world model | **63.31** EWMScore |
 
 <br/>
 
@@ -239,6 +256,6 @@ The codebase was originally forked from [LeRobot](https://github.com/huggingface
 
 <div align="center">
 
-&copy; 2026 Sber Robotics Center &middot; Manipulation Team
+&copy; 2026 Sber Robotics Center &middot; Brain Team
 
 </div>
