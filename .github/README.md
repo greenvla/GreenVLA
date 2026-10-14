@@ -22,7 +22,7 @@
 <br/>
 
 <!-- TODO: add a hero image or GIF here -->
-   <img src="https://github.com/greenvla/GreenVLA/raw/main/assets/green_img.jpg" width="1024" />
+   <img src="https://github.com/greenvla/GreenVLA/raw/main/assets/green_img.jpg" width="1024" alt="Green-VLA on the Green humanoid" />
 
 </div>
 
